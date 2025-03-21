@@ -3,7 +3,9 @@
     <div class="projects-container">
       <div class="header">
         <h1 class="project-title">Проекты</h1>
+        <!-- Кнопка создания проекта (отображается только для админов, администрации ВШЦТ и заказчиков) -->
         <q-btn
+          v-if="mainStore.canCreateProject()"
           label="Создать проект"
           color="primary"
           @click="openCreateProjectDialog"
@@ -49,8 +51,9 @@
             </div>
           </div>
 
-          <!-- Кнопка удаления проекта -->
+          <!-- Кнопка удаления проекта (отображается только для админов, администрации ВШЦТ и заказчиков) -->
           <q-btn
+            v-if="mainStore.canDeleteProject()"
             flat
             color="negative"
             icon="delete"
@@ -140,6 +143,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { getAll, remove } from 'src/api/project.api';
+import { useMainStore } from 'src/stores/main-store';
 import CreateProjectDialog from './CreateProjectDialog.vue';
 
 interface Project {
@@ -153,6 +157,9 @@ interface Project {
 
 // Данные проектов
 const projects = ref<Project[]>([]);
+
+// Хранилище
+const mainStore = useMainStore();
 
 // Загрузка проектов из базы данных
 const loadProjects = async () => {

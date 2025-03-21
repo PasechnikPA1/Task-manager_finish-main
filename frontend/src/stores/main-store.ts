@@ -23,6 +23,7 @@ export const useMainStore = defineStore('main', () => {
     portfolio: [] as PortfolioDto[],
   });
 
+  // Инициализация состояния приложения
   const initAppState = (appState: LoginResponseDto) => {
     state.userId = appState.userId;
     state.username = appState.username;
@@ -31,6 +32,7 @@ export const useMainStore = defineStore('main', () => {
     state.roles = appState.roles;
   };
 
+  // Получение текущего пользователя
   const getCurrentUser = (): SecuredUser => {
     return {
       id: state.userId,
@@ -46,14 +48,20 @@ export const useMainStore = defineStore('main', () => {
     };
   };
 
+  // Проверка ролей
   const isAdmin = () => state.roles.some((r) => r === Role.admin);
   const isCustomer = () => state.roles.some((r) => r === Role.customer);
   const isDirectorate = () => state.roles.some((r) => r === Role.directorate);
-  const isExpert = () => state.roles.some((r) => r === Role.expert); // Добавляем проверку для эксперта
-  const isUser = () => state.roles.some((r) => r === Role.user); // Добавляем проверку для пользователя
+  const isExpert = () => state.roles.some((r) => r === Role.expert);
+  const isUser = () => state.roles.some((r) => r === Role.user);
 
-  // Метод для проверки, может ли пользователь создавать проекты
+  // Проверка, может ли пользователь создавать проекты
   const canCreateProject = () => {
+    return isAdmin() || isCustomer() || isDirectorate();
+  };
+
+  // Проверка, может ли пользователь удалять проекты
+  const canDeleteProject = () => {
     return isAdmin() || isCustomer() || isDirectorate();
   };
 
@@ -63,9 +71,10 @@ export const useMainStore = defineStore('main', () => {
     isAdmin,
     isCustomer,
     isDirectorate,
-    isExpert, // Экспортируем метод isExpert
-    isUser,   // Экспортируем метод isUser
+    isExpert,
+    isUser,
     canCreateProject,
+    canDeleteProject, // Добавляем метод canDeleteProject
     getCurrentUser,
   };
 });
