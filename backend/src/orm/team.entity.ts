@@ -11,7 +11,7 @@ import {
   
 import { User } from './user.entity';
   
-import { PrivacyTeam, StatusTeam } from 'src/common/types'; 
+import { PrivacyTeam, StatusTeam, TeamDto } from 'src/common/types'; 
 import { Portfolio } from './portfolio.entity';
 import { Project } from './project.entity';
 
@@ -51,4 +51,19 @@ export class Team {
 
     @ManyToOne(() => User, (user) => user.team_owner, { onDelete: 'CASCADE' })
     user_owner: User;
+
+    getTeamDto(): TeamDto {
+        return {
+            id: this.id,
+            name: this.name,
+            description: this.description,
+            privacy: this.privacy,
+            status: this.status,
+            user_leader: this.user_leader.getSecuredDto(),
+            user_owner: this.user_owner.getSecuredDto(),
+            user: this.user.map(user => user.getSecuredDto()),
+            portfolio: this.portfolio.map(portfolio => portfolio.getPortfolioDto()),
+            project: this.project.getProjectDto(),
+        }
+    }
 }

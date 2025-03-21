@@ -2,17 +2,29 @@
   <q-layout view="hHh Lpr fFf">
     <q-header elevated>
       <q-toolbar>
-        <q-btn flat dense round icon="arrow_drop_down" aria-label="Menu" @click="toggleLeftDrawer" />
-
         <q-toolbar-title class="row items-center q-gutter-sm justify-left">
+          <!-- Аватар без обработчика клика -->
           <q-avatar icon="account_circle" size="xl" />
-          <span>{{ `${firstname} ${lastname}` }}</span>
+
+          <!-- Имя и фамилия с обработчиком клика и стилями -->
+          <span
+            class="clickable-name"
+            @click="openUserProfile"
+          >
+            {{ `${firstname} ${lastname}` }}
+          </span>
+
+          <!-- Роли -->
+          <span v-if="formattedRoles.length > 0">
+            {{ formattedRoles.length > 1 ? ', ' : ' ' }}
+            {{ formattedRoles.join(', ') }}
+          </span>
         </q-toolbar-title>
 
         <div class="q-mr-md">
           <q-btn flat label="Проекты" @click="goToProjects" />
           <q-btn flat label="Идеи" @click="goToIdeas" />
-          <q-btn flat label="Команды" @click="goToTeams" /> <!-- Обновленная кнопка -->
+          <q-btn flat label="Команды" @click="goToTeams" />
         </div>
 
         <div>
@@ -21,49 +33,22 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="leftDrawerOpen" show-if-above bordered>
-      <q-scroll-area style="height: 100%">
-        <div class="q-pa-md">
-          <!-- Role Selection -->
-          <div class="q-mb-md">
-            <div class="text-h6">Выберите роль</div>
-            <q-list>
-              <q-item clickable v-ripple>
-                <q-item-section>Студент</q-item-section>
-              </q-item>
-              <q-item clickable v-ripple>
-                <q-item-section>Заказчик</q-item-section>
-              </q-item>
-              <q-item clickable v-ripple>
-                <q-item-section>Эксперт</q-item-section>
-              </q-item>
-              <q-item clickable v-ripple>
-                <q-item-section>Дирекция ВШЦТ</q-item-section>
-              </q-item>
-              <q-item clickable v-ripple>
-                <q-item-section>Администратор</q-item-section>
-              </q-item>
-            </q-list>
-          </div>
-
-          <SideMenu />
-        </div>
-      </q-scroll-area>
-    </q-drawer>
-
     <q-page-container>
       <router-view />
     </q-page-container>
+
+    <!-- Передаем formattedRoles в UserProfile -->
+    <UserProfile ref="userProfile" :roles="formattedRoles" />
   </q-layout>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import SideMenu from 'components/SideMenu.vue';
+import { computed, ref } from 'vue';
 import { useMainStore } from 'src/stores/main-store';
 import { storeToRefs } from 'pinia';
 import * as api from '../api/auth.api';
 import { useRouter } from 'vue-router';
+import UserProfile from './UserProfile.vue';
 
 defineOptions({
   name: 'MainLayout',
@@ -71,14 +56,28 @@ defineOptions({
 
 const mainStore = useMainStore();
 const router = useRouter();
+const userProfile = ref();
 
-let { firstname, lastname } = storeToRefs(mainStore);
+let { firstname, lastname, roles } = storeToRefs(mainStore);
 
-const leftDrawerOpen = ref(false);
-
-function toggleLeftDrawer() {
-  leftDrawerOpen.value = !leftDrawerOpen.value;
-}
+const formattedRoles = computed(() => {
+  return roles.value.map((role) => {
+    switch (role) {
+      case 'admin':
+        return 'Администратор';
+      case 'customer':
+        return 'Заказчик';
+      case 'directorate':
+        return 'Дирекция ВШЦТ';
+      case 'expert':
+        return 'Эксперт';
+      case 'user':
+        return 'Студент';
+      default:
+        return role;
+    }
+  });
+});
 
 const onLogout = () => {
   api.logout();
@@ -94,7 +93,11 @@ const goToIdeas = () => {
 };
 
 const goToTeams = () => {
-  router.push('/teams'); // Переход на страницу команд
+  router.push('/teams');
+};
+
+const openUserProfile = () => {
+  userProfile.value.open();
 };
 </script>
 
@@ -107,5 +110,16 @@ const goToTeams = () => {
 
 .q-mr-md {
   margin-right: 16px;
+}
+
+/* Стили для кликабельного имени и фамилии */
+.clickable-name {
+  cursor: pointer;
+  color: rgb(255, 255, 255); /* Черный цвет текста */
+  transition: color 0.3s ease;
+}
+
+.clickable-name:hover {
+  color: #1d0101; /* Цвет при наведении (например, синий) */
 }
 </style>

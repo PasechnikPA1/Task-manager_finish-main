@@ -3,9 +3,11 @@
     <div class="projects-container">
       <div class="header">
         <h1 class="project-title">Команды</h1>
+        <!-- Кнопка "Создать команду" для ролей admin, customer, directorate -->
         <q-btn
-          color="primary"
+          v-if="canCreateTeam"
           label="Создать команду"
+          color="primary"
           @click="showCreateDialog = true"
           class="q-mb-md"
         />
@@ -13,28 +15,24 @@
 
       <!-- Поиск и фильтры -->
       <div class="search-and-filters q-mb-md">
+        <!-- Поле поиска по названию команды -->
         <q-input
           v-model="searchQuery"
-          placeholder="Поиск по названию"
+          label="Поиск по названию"
           outlined
           dense
-          class="q-mb-md"
-          clearable
-        >
-          <template v-slot:append>
-            <q-icon name="search" />
-          </template>
-        </q-input>
+          class="q-mb-sm"
+        />
 
+        <!-- Фильтры: открытая и закрытая команды -->
         <div class="filters">
-          <q-chip
+          <q-btn
             v-for="filter in filters"
             :key="filter.label"
             :label="filter.label"
-            :color="filter.active ? 'primary' : 'grey-5'"
-            text-color="white"
-            clickable
+            :color="filter.active ? 'primary' : 'grey'"
             @click="toggleFilter(filter)"
+            class="q-mr-sm"
           />
         </div>
       </div>
@@ -51,13 +49,22 @@
         >
           <q-card-section>
             <div class="flex justify-between items-center">
-              <div>
+              <div class="flex items-center">
                 <div class="text-h6">#{{ index + 1 }} {{ team.title }}</div>
+
+                <!-- Кнопка "Вступить" (отображается только для admin и user и только для открытых команд) -->
+                <q-btn
+                  v-if="canJoinTeam && !team.isPrivate"
+                  color="positive"
+                  label="Вступить"
+                  @click="joinTeam(team.id)"
+                  class="q-ml-sm"
+                />
               </div>
               <div class="flex items-center">
                 <!-- Иконка с количеством участников (увеличена) -->
                 <q-icon name="people" class="q-icon--large q-mr-sm" />
-                <span class="q-mr-md text-h6">{{ team.membersCount }}</span>
+                <span class="q-mr-md text-h6">{{ team.members.length }}</span>
 
                 <!-- Статус приватности -->
                 <q-chip
@@ -73,6 +80,17 @@
                   color="primary"
                   label="Открыть"
                   @click="toggleTeamDetails(team.id)"
+                  class="q-ml-sm"
+                />
+
+                <!-- Красный флажок (виден только для admin, customer, directorate) -->
+                <q-btn
+                  v-if="canMarkForDeletion"
+                  flat
+                  round
+                  :color="team.markedForDeletion ? 'red' : 'grey'"
+                  icon="bookmark"
+                  @click="toggleMarkForDeletion(team.id)"
                   class="q-ml-sm"
                 />
               </div>
@@ -94,10 +112,10 @@
                   <strong>Описание:</strong> {{ team.description }}
                 </div>
                 <div class="text-subtitle2 q-mb-sm">
-                  <strong>Количество участников:</strong> {{ team.membersCount }}
+                  <strong>Максимальное количество участников:</strong> {{ team.maxMembers }}
                 </div>
                 <div class="text-subtitle2 q-mb-sm">
-                  <strong>Приватность:</strong> {{ team.isPrivate ? 'Закрытая' : 'Открытая' }}
+                  <strong>Участники:</strong> {{ team.members.join(', ') }}
                 </div>
                 <div class="text-subtitle2">
                   <strong>Статус:</strong> {{ team.status }}
@@ -134,8 +152,8 @@
               required
             />
             <q-input
-              v-model="newTeam.membersCount"
-              label="Количество участников"
+              v-model="newTeam.maxMembers"
+              label="Максимальное количество участников"
               type="number"
               class="q-mb-md"
               outlined
@@ -160,8 +178,9 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { storeToRefs } from 'pinia'; 
 import { useMainStore } from 'src/stores/main-store';
-import { storeToRefs } from 'pinia';
+import { Role } from '../../../backend/src/common/types'; // Импортируем перечисление Role
 
 // Типы
 interface Filter {
@@ -175,9 +194,11 @@ interface Team {
   description: string;
   createdBy: string; // Имя пользователя
   createdAt: string; // Дата создания
-  membersCount: number;
+  members: string[]; // Имена участников
+  maxMembers: number; // Максимальное количество участников
   isPrivate: boolean; // Приватность команды
   status: string; // Статус команды
+  markedForDeletion: boolean; // Помечена ли команда на удаление
 }
 
 // Хранилище
@@ -194,6 +215,11 @@ const filters = ref<Filter[]>([
   { label: 'Закрыта', active: false },
 ]);
 
+// Переключение фильтров
+const toggleFilter = (filter: Filter) => {
+  filters.value.forEach((f) => (f.active = f.label === filter.label));
+};
+
 // Команды (пример данных)
 const teams = ref<Team[]>([
   {
@@ -202,9 +228,11 @@ const teams = ref<Team[]>([
     description: 'Команда для разработки инновационных решений в области медицины.',
     createdBy: 'Иван Иванов',
     createdAt: '2023-10-01',
-    membersCount: 3,
+    members: ['Иван Иванов', 'Петр Петров', 'Мария Сидорова'],
+    maxMembers: 5,
     isPrivate: false,
     status: 'Открыта',
+    markedForDeletion: false, // По умолчанию не помечена на удаление
   },
   {
     id: 2,
@@ -212,17 +240,14 @@ const teams = ref<Team[]>([
     description: 'Команда для разработки интеллектуальных систем и платформ.',
     createdBy: 'Петр Петров',
     createdAt: '2023-10-05',
-    membersCount: 5,
+    members: ['Петр Петров', 'Алексей Алексеев'],
+    maxMembers: 3,
     isPrivate: true,
     status: 'Закрыта',
+    markedForDeletion: false, // По умолчанию не помечена на удаление
   },
   // Остальные команды...
 ]);
-
-// Переключение фильтров
-const toggleFilter = (filter: Filter) => {
-  filters.value.forEach((f) => (f.active = f === filter));
-};
 
 // Фильтрация команд по статусу и поиску
 const filteredTeams = computed(() => {
@@ -256,6 +281,22 @@ const toggleTeamDetails = (teamId: number) => {
   }
 };
 
+// Логика для пометки на удаление
+const toggleMarkForDeletion = (teamId: number) => {
+  const team = teams.value.find((t) => t.id === teamId);
+  if (team) {
+    team.markedForDeletion = !team.markedForDeletion;
+  }
+};
+
+// Логика для вступления в команду
+const joinTeam = (teamId: number) => {
+  const team = teams.value.find((t) => t.id === teamId);
+  if (team && team.members.length < team.maxMembers) {
+    team.members.push(`${firstname.value} ${lastname.value}`);
+  }
+};
+
 // Форматирование даты
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -274,9 +315,11 @@ const newTeam = ref<Team>({
   description: '',
   createdBy: `${firstname.value} ${lastname.value}`, // Используем имя авторизованного пользователя
   createdAt: new Date().toISOString().split('T')[0], // Текущая дата
-  membersCount: 0,
+  members: [], // Пустой массив участников
+  maxMembers: 0, // Максимальное количество участников
   isPrivate: false, // По умолчанию команда открытая
   status: 'Открыта', // По умолчанию статус "Открыта"
+  markedForDeletion: false, // По умолчанию не помечена на удаление
 });
 
 const createTeam = () => {
@@ -291,14 +334,34 @@ const createTeam = () => {
     description: '',
     createdBy: `${firstname.value} ${lastname.value}`, // Используем имя авторизованного пользователя
     createdAt: new Date().toISOString().split('T')[0], // Текущая дата
-    membersCount: 0,
+    members: [], // Пустой массив участников
+    maxMembers: 0, // Максимальное количество участников
     isPrivate: false,
     status: 'Открыта',
+    markedForDeletion: false, // По умолчанию не помечена на удаление
   };
 
   // Закрытие модального окна
   showCreateDialog.value = false;
 };
+
+// Проверка, может ли пользователь создавать команды
+const canCreateTeam = computed(() => {
+  const roles = mainStore.roles;
+  return roles.includes(Role.admin) || roles.includes(Role.customer) || roles.includes(Role.directorate);
+});
+
+// Проверка, может ли пользователь видеть кнопку "Вступить"
+const canJoinTeam = computed(() => {
+  const roles = mainStore.roles;
+  return roles.includes(Role.admin) || roles.includes(Role.user);
+});
+
+// Проверка, может ли пользователь видеть красный флажок
+const canMarkForDeletion = computed(() => {
+  const roles = mainStore.roles;
+  return roles.includes(Role.admin) || roles.includes(Role.customer) || roles.includes(Role.directorate);
+});
 </script>
 
 <style scoped>

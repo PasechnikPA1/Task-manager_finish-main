@@ -16,41 +16,47 @@
         <div
           class="project-card"
           v-for="project in paginatedProjects"
-          :key="project.title"
-          @click="openProjectDetails(project)"
+          :key="project.id"
         >
-          <h2 class="project-heading"><strong>{{ project.title.replace(/^#\d+\s*/, '') }}</strong></h2>
-          <p class="project-description">{{ project.description }}</p>
+          <div @click="openProjectDetails(project)">
+            <h2 class="project-heading"><strong>{{ project.name }}</strong></h2>
+            <p class="project-description">{{ project.solution }}</p>
 
-          <!-- Инициатор с иконкой -->
-          <div class="project-initiator">
-            <q-icon name="person" class="q-mr-sm" />
-            <strong>Инициатор:</strong> {{ project.initiator }}
-          </div>
-
-          <!-- Статус проекта (команда и заявки) -->
-          <div class="project-status">
-            <div class="status-item">
-              <q-icon name="people" class="q-mr-sm" />
-              <span>Команда до {{ project.teamSize }} человек</span>
+            <!-- Инициатор с иконкой -->
+            <div class="project-initiator">
+              <q-icon name="person" class="q-mr-sm" />
+              <strong>Заказчик:</strong> {{ project.customer }}
             </div>
-            <div class="status-item">
-              <q-icon name="mail" class="q-mr-sm" />
-              <span>Подано заявок: {{ project.applicationsCount }}</span>
+
+            <!-- Статус проекта (команда и заявки) -->
+            <div class="project-status">
+              <div class="status-item">
+                <q-icon name="people" class="q-mr-sm" />
+                <span>Команда до {{ project.maxUsers }} человек</span>
+              </div>
+            </div>
+
+            <!-- Технологии -->
+            <div class="technologies">
+              <span
+                v-for="tech in project.stack.split(', ')"
+                :key="tech"
+                :class="getTechClass(tech)"
+                class="tech-tag"
+              >
+                {{ tech }}
+              </span>
             </div>
           </div>
 
-          <!-- Технологии -->
-          <div class="technologies">
-            <span
-              v-for="tech in project.technologies"
-              :key="tech"
-              :class="getTechClass(tech)"
-              class="tech-tag"
-            >
-              {{ tech }}
-            </span>
-          </div>
+          <!-- Кнопка удаления проекта -->
+          <q-btn
+            flat
+            color="negative"
+            icon="delete"
+            @click.stop="confirmDelete(project.id)"
+            class="delete-btn"
+          />
         </div>
       </div>
 
@@ -72,28 +78,24 @@
       <q-dialog v-model="showProjectDetails">
         <q-card v-if="selectedProject" class="project-details-card">
           <q-card-section>
-            <h2 class="project-heading"><strong>{{ selectedProject.title.replace(/^#\d+\s*/, '') }}</strong></h2>
-            <p class="project-description">{{ selectedProject.description }}</p>
+            <h2 class="project-heading"><strong>{{ selectedProject.name }}</strong></h2>
+            <p class="project-description">{{ selectedProject.solution }}</p>
 
             <div class="project-initiator">
               <q-icon name="person" class="q-mr-sm" />
-              <strong>Инициатор:</strong> {{ selectedProject.initiator }}
+              <strong>Заказчик:</strong> {{ selectedProject.customer }}
             </div>
 
             <div class="project-status">
               <div class="status-item">
                 <q-icon name="people" class="q-mr-sm" />
-                <span>Команда до {{ selectedProject.teamSize }} человек</span>
-              </div>
-              <div class="status-item">
-                <q-icon name="mail" class="q-mr-sm" />
-                <span>Подано заявок: {{ selectedProject.applicationsCount }}</span>
+                <span>Команда до {{ selectedProject.maxUsers }} человек</span>
               </div>
             </div>
 
             <div class="technologies">
               <span
-                v-for="tech in selectedProject.technologies"
+                v-for="tech in selectedProject.stack.split(', ')"
                 :key="tech"
                 :class="getTechClass(tech)"
                 class="tech-tag"
@@ -109,67 +111,72 @@
         </q-card>
       </q-dialog>
 
-      <!-- Диалог для создания проекта -->
-      <CreateProjectDialog ref="createProjectDialog" @create="addProject" />
+      <!-- Диалог подтверждения удаления -->
+      <q-dialog v-model="confirmDeleteDialog">
+        <q-card>
+          <q-card-section>
+            <h6>Вы уверены, что хотите удалить проект?</h6>
+          </q-card-section>
+
+          <q-card-actions align="right">
+            <q-btn flat label="Отмена" color="primary" v-close-popup />
+            <q-btn
+              flat
+              label="Удалить"
+              color="negative"
+              @click="handleDelete"
+              v-close-popup
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
     </div>
+
+    <!-- Диалог создания проекта -->
+    <CreateProjectDialog ref="createProjectDialog" @create="addProject" />
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { getAll, remove } from 'src/api/project.api';
 import CreateProjectDialog from './CreateProjectDialog.vue';
 
 interface Project {
-  title: string;
-  description: string;
-  initiator: string;
-  technologies: string[];
-  teamSize: number;
-  applicationsCount: number;
+  id: number;
+  name: string;
+  solution: string;
+  stack: string;
+  maxUsers: string;
+  customer: string;
 }
 
-const projects = ref<Project[]>([
-  {
-    title: '#1 Создание сайта для проведения конкурса "Педагог года"',
-    description: 'Разработка веб-приложения для создания анкет преподавателей и проведения голосования за них',
-    initiator: 'Екатерина Сердюкова',
-    technologies: ['C#', '.NET 6.0', 'SQLite', 'Git', 'Docker'],
-    teamSize: 7,
-    applicationsCount: 2,
-  },
-  {
-    title: '#3 тест 25.06',
-    description: 'Вопрос: SpringBoot, FireBase, Elasticsearch',
-    initiator: 'Екатерина Сердюкова',
-    technologies: ['PostgreSQL', 'Docker', 'Git'],
-    teamSize: 7,
-    applicationsCount: 1,
-  },
-  {
-    title: '#5 Виртуальный консультант студента (ДЛЯ 3 КУРСА)!!!',
-    description: 'Создать цифровой справочник, var-бот агент.',
-    initiator: 'Екатерина Сердюкова',
-    technologies: ['PostgreSQL', 'Docker', 'Git'],
-    teamSize: 5,
-    applicationsCount: 0,
-  },
-  {
-    title: '#2 Создание кабинета студента/преподавателя',
-    description: 'Создание портала, где студенты и преподаватели смогут зарегистрироваться и вести учет посещаемости, оценок, расписания и других элементов учебного процесса.',
-    initiator: 'Екатерина Сердюкова',
-    technologies: ['PostgreSQL', 'Docker', 'Git'],
-    teamSize: 7,
-    applicationsCount: 1,
-  },
-  {
-    title: '#4 Веб приложение "Лига тенниса" (для 3 курса!!!)',
-    description: 'Создать многоплатформенное мобильное/веб приложение, которое реализует функционал: регистрация, просмотр событий лиги, турниры, матчи, рейтинги игроков, результаты матчей, календарь событий.',
-    initiator: 'Екатерина Сердюкова',
-    technologies: ['C++', '.NET 6.0', 'MySQL', 'Docker'],
-    teamSize: 7,
-    applicationsCount: 1,
-  },
-]);
+// Данные проектов
+const projects = ref<Project[]>([]);
+
+// Загрузка проектов из базы данных
+const loadProjects = async () => {
+  try {
+    const data = await getAll(); // Загружаем проекты из API
+    if (data) {
+      projects.value = data.map((project) => ({
+        id: project.id,
+        name: project.name,
+        solution: project.solution,
+        stack: project.stack.join(', '), // Преобразуем массив в строку
+        maxUsers: project.maxUsers,
+        customer: project.customer,
+      }));
+    }
+  } catch (error) {
+    console.error('Ошибка при загрузке проектов:', error);
+  }
+};
+
+// Загружаем проекты при монтировании компонента
+onMounted(() => {
+  loadProjects();
+});
 
 // Пагинация
 const itemsPerPage = 4;
@@ -183,15 +190,18 @@ const paginatedProjects = computed(() => {
 
 // Функция для определения класса технологии
 const getTechClass = (tech: string) => {
-  const programmingLanguages = ['C#', 'C++', 'Python', 'Javascript', 'SpringBoot', '.NET 6.0'];
-  const databases = ['SQLite', 'PostgreSQL', 'MySQL', 'FireBase', 'Elasticsearch'];
+  const programmingLanguages = ['HTML', 'CSS', 'JavaScript', 'TypeScript', 'React', 'Node.js'];
+  const databases = ['PostgreSQL', 'PostgeSQL', 'MySQL']; // Добавили PostgeSQL
   const tools = ['Git', 'Docker'];
 
-  if (programmingLanguages.includes(tech)) {
+  // Убираем лишние пробелы
+  const trimmedTech = tech.trim();
+
+  if (programmingLanguages.includes(trimmedTech)) {
     return 'tech-green'; // Языки программирования
-  } else if (databases.includes(tech)) {
+  } else if (databases.includes(trimmedTech)) {
     return 'tech-orange'; // Базы данных
-  } else if (tools.includes(tech)) {
+  } else if (tools.includes(trimmedTech)) {
     return 'tech-red'; // Инструменты (Git, Docker)
   }
   return ''; // По умолчанию
@@ -214,7 +224,39 @@ const openCreateProjectDialog = () => {
 };
 
 const addProject = (newProject: Project) => {
-  projects.value.push(newProject);
+  projects.value.push(newProject); // Добавляем новый проект в список
+};
+
+// Логика для удаления проекта
+const confirmDeleteDialog = ref(false);
+const projectIdToDelete = ref<number | null>(null);
+
+const confirmDelete = (id: number) => {
+  projectIdToDelete.value = id;
+  confirmDeleteDialog.value = true;
+};
+
+const handleDelete = () => {
+  if (projectIdToDelete.value !== null) {
+    deleteProject(projectIdToDelete.value);
+  }
+};
+
+const deleteProject = async (id: number) => {
+  try {
+    const deletedProject = await remove(id); // Вызываем API для удаления проекта
+    if (deletedProject) {
+      // Удаляем проект из списка, создавая новый массив
+      projects.value = projects.value.filter((project) => project.id !== id);
+
+      // Если на текущей странице больше нет проектов, переходим на предыдущую страницу
+      if (paginatedProjects.value.length === 0 && currentPage.value > 1) {
+        currentPage.value -= 1;
+      }
+    }
+  } catch (error) {
+    console.error('Ошибка при удалении проекта:', error);
+  }
 };
 </script>
 
@@ -256,6 +298,7 @@ const addProject = (newProject: Project) => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .project-card:hover {
@@ -332,5 +375,11 @@ const addProject = (newProject: Project) => {
 .project-details-card {
   width: 600px;
   max-width: 90%;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
 }
 </style>

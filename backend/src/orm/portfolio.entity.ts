@@ -9,7 +9,7 @@ import {
   
 import { User } from './user.entity';
   
-import { UserCommandStatus } from 'src/common/types'; 
+import { PortfolioDto, UserCommandStatus } from 'src/common/types'; 
 import { Team } from './team.entity';
 
 @Entity()
@@ -32,4 +32,15 @@ export class Portfolio {
 
     @ManyToOne(() => User, (user) => user.portfolio, { onDelete: 'CASCADE' })
     user: User;
+
+    getPortfolioDto(): PortfolioDto{
+        return {
+            id: this.id,
+            entryDate: this.entryDate,
+            exclusionDate: this.exclusionDate,
+            status: this.status,
+            team: this.team.getTeamDto(),
+            user: this.user.getSecuredDto(),
+        }
+    }
 }

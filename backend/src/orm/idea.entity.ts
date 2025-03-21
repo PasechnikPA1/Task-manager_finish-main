@@ -43,11 +43,11 @@ export class Idea {
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date; 
 
-    @OneToMany(() => Comments, (comments) => comments.idea)
-    comment: Comments[];
+    @Column()
+    customer: string;
 
-    @ManyToOne(() => User, (user) => user.idea_customer, { onDelete: 'CASCADE' })
-    customer: User;
+    @OneToMany(() => Comments, (comments) => comments.idea)
+    comment: Comments[];    
     
     @ManyToOne(() => User, (user) => user.idea_initiator, { onDelete: 'CASCADE' })
     initiator: User;
